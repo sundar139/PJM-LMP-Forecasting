@@ -1,132 +1,135 @@
-PJM LMP Forecasting — Local to Cloud MLOps
+# PJM Energy Forecasting ⚡️
 
-Forecast PJM locational marginal prices (LMP) with an end‑to‑end pipeline that runs locally and scales to AWS. The stack includes XGBoost, MLflow, Feast, FastAPI, Terraform, and Kubernetes.
+This project focuses on predicting Locational Marginal Prices (LMP) in the PJM (Pennsylvania-New Jersey-Maryland Interconnection) electricity market. It encompasses data ingestion from the PJM API, data transformation and cleaning, feature engineering, model training using XGBoost, and a FastAPI-based serving layer for real-time predictions. The goal is to provide accurate LMP forecasts to aid in energy trading and grid management decisions.
 
-## Features
+## 🚀 Key Features
 
-- Complete workflow: ingestion, ETL, validation, feature engineering, training, serving
-- Modern MLOps: XGBoost modeling, MLflow experiment tracking, Feast feature store
-- Local → Cloud: parquet outputs under `data/`, S3 in cloud mode, deployable to EKS
-- CI ready: automated tests via GitHub Actions
+- **Data Ingestion:** Fetches raw LMP, load forecasts, and metered load data from the PJM API using the `gridstatus` library.
+- **Data Transformation:** Cleans, transforms, and prepares raw data for model training, including handling timestamps, renaming columns, and clipping outliers.
+- **Feature Engineering:** Creates lag, rolling, and cyclical time features to capture temporal patterns in the data.
+- **Model Training:** Trains an XGBoost regression model to predict LMP, leveraging MLflow for experiment tracking and model management.
+- **API Serving:** Provides a FastAPI endpoint to serve real-time LMP predictions based on the latest processed data and the trained XGBoost model.
+- **Configuration Management:** Uses a centralized configuration system to manage file paths, environment variables, and other project settings.
+- **Feature Store Integration (Planned):** Includes a basic feature store configuration, suggesting future integration with a more comprehensive feature store system.
 
-## Repository Layout
+## 🛠️ Tech Stack
 
-- `ingestion/` – data fetch, ETL, validation
-- `training/` – model training and MLflow logging
-- `serving/` – FastAPI app and runtime
-- `feature_repo/` – Feast feature definitions/config
-- `infrastructure/k8s/` – Kubernetes manifests (serving, training job)
-- `infrastructure/terraform/` – Terraform modules for VPC/EKS/S3/etc.
-- `data/` – local artifacts (`raw`, `processed`, `features`, `models`)
+- **Frontend:** N/A (API-focused)
+- **Backend:** Python
+- **API Framework:** FastAPI
+- **Data Science:**
+  - pandas
+  - numpy
+  - xgboost
+  - scikit-learn (implicitly, via xgboost)
+- **Data Ingestion:** gridstatus
+- **Data Storage:** Parquet files
+- **MLOps:** MLflow
+- **Cloud (Optional):** AWS S3 (for data storage)
+- **Configuration:** dataclasses, python-dotenv
+- **Other:**
+  - pathlib
+  - datetime
+  - argparse
+  - typing
+  - boto3 (conditional)
 
-## Prerequisites
+## 📦 Getting Started
 
-- Python 3.10+
-- Docker (for container builds)
-- AWS CLI and permissions for EKS/ECR/S3/IAM
-- Terraform CLI and `kubectl`
+### Prerequisites
 
-## Quickstart (Local)
+- Python 3.8+
+- Poetry (recommended) or pip
+- An AWS account (if using S3)
+- MLflow (for experiment tracking)
 
-1. Create a virtual environment and install dependencies:
+### Installation
+
+1.  **Clone the repository:**
+
+    ```bash
+    git clone <repository_url>
+    cd <repository_directory>
+    ```
+
+2.  **Install dependencies using Poetry (recommended):**
+
+    ```bash
+    poetry install
+    ```
+
+    Or, install dependencies using pip:
+
+    ```bash
+    pip install -r requirements.txt
+    ```
+
+3.  **Configure environment variables:**
+
+    Create a `.env` file in the project root directory and add the necessary environment variables. Example:
+
+    ```
+    AWS_ACCESS_KEY_ID=<your_aws_access_key_id>
+    AWS_SECRET_ACCESS_KEY=<your_aws_secret_access_key>
+    AWS_REGION=<your_aws_region>
+    S3_BUCKET_NAME=<your_s3_bucket_name>
+    USE_S3=False # Set to True if you want to use S3
+    ```
+
+### Running Locally
+
+1.  **Fetch PJM Data:**
+
+    ```bash
+    python ingestion/fetch_pjm_data.py --start_date 2023-01-01 --end_date 2023-01-05
+    ```
+
+2.  **Run the ETL Pipeline:**
+
+    ```bash
+    python ingestion/etl_pipeline.py
+    ```
+
+3.  **Train the XGBoost Model:**
+
+    ```bash
+    python training/train_xgb.py
+    ```
+
+4.  **Start the FastAPI Server:**
+
+    ```bash
+    uvicorn serving.main:app --reload
+    ```
+
+    Access the API at `http://127.0.0.1:8000/docs` to view the interactive API documentation.
+
+## 📂 Project Structure
 
 ```
-python -m venv .venv
-./.venv/Scripts/Activate.ps1
-pip install -r requirements.txt
+├── ingestion
+│   ├── __init__.py
+│   ├── config.py
+│   ├── etl_pipeline.py
+│   └── fetch_pjm_data.py
+├── serving
+│   ├── __init__.py
+│   ├── main.py
+│   └── model_loader.py
+├── training
+│   ├── __init__.py
+│   └── train_xgb.py
+├── feature_repo
+│   ├── __init__.py
+│   ├── feature_definitions.py
+│   └── feature_store.yaml
+├── data
+│   ├── models
+│   │   └── xgb_rt_lmp.json
+│   ├── processed
+│   └── raw
+├── .env
+├── README.md
+├── requirements.txt
+└── poetry.lock
 ```
-
-2. Download raw PJM data (one‑day test run):
-
-```
-python -m ingestion.fetch_pjm_data --test-run
-```
-
-3. Run ETL on the latest raw file:
-
-```
-$raw = Get-ChildItem .\data\raw | Sort-Object LastWriteTime | Select-Object -Last 1
-python -m ingestion.etl_pipeline --raw-path $raw.FullName
-```
-
-4. Validate processed data:
-
-```
-$proc = Get-ChildItem .\data\processed | Sort-Object LastWriteTime | Select-Object -Last 1
-python -m ingestion.validate_data --processed-path $proc.FullName
-```
-
-5. Train an XGBoost model (small test run):
-
-```
-python -m training.train_xgb --test-run
-```
-
-6. Run tests:
-
-```
-pytest -q
-```
-
-7. Start the API:
-
-```
-uvicorn serving.main:app --reload
-```
-
-Open `http://127.0.0.1:8000/docs` to view `GET /health` and `POST /predict`.
-
-## Cloud Deployment (AWS EKS)
-
-1. Enable cloud mode in `.env`:
-
-```
-USE_S3=1
-```
-
-2. Provision infrastructure:
-
-```
-cd infrastructure/terraform
-terraform init
-terraform plan -out=tfplan
-terraform apply tfplan
-```
-
-3. Build container images:
-
-```
-docker build -t ghcr.io/your-org/pjm-serving:latest -f serving/Dockerfile .
-docker build -t ghcr.io/your-org/pjm-training:latest -f training/Dockerfile .
-```
-
-4. Deploy to Kubernetes (PVC `pjm-data-pvc` mounted at `/app/data`):
-
-```
-kubectl apply -f infrastructure/k8s/serving.yaml
-kubectl apply -f infrastructure/k8s/training-job.yaml
-```
-
-The service exposes a LoadBalancer on port `80` forwarding to container port `8000`.
-
-## API
-
-- `GET /health` – basic status
-- `POST /predict` – returns the latest LMP prediction
-
-## Testing and CI
-
-- Run tests locally: `pytest -q`
-- CI: `.github/workflows/ci.yml` executes tests on push/PR
-
-## Roadmap
-
-- GPU training node group (Spot or On‑Demand)
-- VPC peering for data platform integration
-- Full Feast integration (offline + online store)
-- Glue Catalog + Athena ETL lakehouse
-- Argo Workflows for scheduled retraining pipelines
-- Canary/blue‑green deployment (ALB weighted routing)
-- S3 optimization (partitioning, compaction jobs)
-- Prefect / Dagster orchestration layer
-- SOC2 logging, IAM hardening, zero‑trust config
