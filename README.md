@@ -1,16 +1,34 @@
-# PJM LMP Forecasting — Local to Cloud MLOps
+PJM LMP Forecasting — Local to Cloud MLOps
 
-Production‑ready pipeline to forecast PJM Locational Marginal Prices (LMP) using XGBoost, logged with MLflow, feature managed via Feast, and served through FastAPI. Runs end‑to‑end locally first, then deploys to AWS EKS via Terraform and Kubernetes.
+Forecast PJM locational marginal prices (LMP) with an end‑to‑end pipeline that runs locally and scales to AWS. The stack includes XGBoost, MLflow, Feast, FastAPI, Terraform, and Kubernetes.
 
-## Overview
+## Features
 
-- Ingestion → ETL → Validation → Feature Engineering → Training → Serving (API)
-- Local runs produce parquet files under `data/` and a model at `data/models/xgb_rt_lmp.json`.
-- Cloud runs switch storage to S3, containerize training/serving, and deploy on EKS.
+- Complete workflow: ingestion, ETL, validation, feature engineering, training, serving
+- Modern MLOps: XGBoost modeling, MLflow experiment tracking, Feast feature store
+- Local → Cloud: parquet outputs under `data/`, S3 in cloud mode, deployable to EKS
+- CI ready: automated tests via GitHub Actions
+
+## Repository Layout
+
+- `ingestion/` – data fetch, ETL, validation
+- `training/` – model training and MLflow logging
+- `serving/` – FastAPI app and runtime
+- `feature_repo/` – Feast feature definitions/config
+- `infrastructure/k8s/` – Kubernetes manifests (serving, training job)
+- `infrastructure/terraform/` – Terraform modules for VPC/EKS/S3/etc.
+- `data/` – local artifacts (`raw`, `processed`, `features`, `models`)
+
+## Prerequisites
+
+- Python 3.10+
+- Docker (for container builds)
+- AWS CLI and permissions for EKS/ECR/S3/IAM
+- Terraform CLI and `kubectl`
 
 ## Quickstart (Local)
 
-1. Create and activate a virtual environment, then install deps:
+1. Create a virtual environment and install dependencies:
 
 ```
 python -m venv .venv
@@ -18,13 +36,13 @@ python -m venv .venv
 pip install -r requirements.txt
 ```
 
-2. Ingest one day of PJM data:
+2. Download raw PJM data (one‑day test run):
 
 ```
 python -m ingestion.fetch_pjm_data --test-run
 ```
 
-3. ETL the latest raw file:
+3. Run ETL on the latest raw file:
 
 ```
 $raw = Get-ChildItem .\data\raw | Sort-Object LastWriteTime | Select-Object -Last 1
@@ -38,7 +56,7 @@ $proc = Get-ChildItem .\data\processed | Sort-Object LastWriteTime | Select-Obje
 python -m ingestion.validate_data --processed-path $proc.FullName
 ```
 
-5. Train a small XGBoost model:
+5. Train an XGBoost model (small test run):
 
 ```
 python -m training.train_xgb --test-run
@@ -56,17 +74,17 @@ pytest -q
 uvicorn serving.main:app --reload
 ```
 
-Open `http://127.0.0.1:8000/docs` and verify `GET /health` and `POST /predict`.
+Open `http://127.0.0.1:8000/docs` to view `GET /health` and `POST /predict`.
 
 ## Cloud Deployment (AWS EKS)
 
-1. Switch `.env` to cloud mode:
+1. Enable cloud mode in `.env`:
 
 ```
 USE_S3=1
 ```
 
-2. Provision infra:
+2. Provision infrastructure:
 
 ```
 cd infrastructure/terraform
@@ -75,30 +93,31 @@ terraform plan -out=tfplan
 terraform apply tfplan
 ```
 
-3. Build and push images:
+3. Build container images:
 
 ```
 docker build -t ghcr.io/your-org/pjm-serving:latest -f serving/Dockerfile .
 docker build -t ghcr.io/your-org/pjm-training:latest -f training/Dockerfile .
 ```
 
-4. Deploy to Kubernetes (requires PVC `pjm-data-pvc` mounting `/app/data`):
+4. Deploy to Kubernetes (PVC `pjm-data-pvc` mounted at `/app/data`):
 
 ```
 kubectl apply -f infrastructure/k8s/serving.yaml
 kubectl apply -f infrastructure/k8s/training-job.yaml
 ```
 
-Service exposes a LoadBalancer on port 80 forwarded to container port 8000.
+The service exposes a LoadBalancer on port `80` forwarding to container port `8000`.
 
 ## API
 
-- `GET /health` → status check
-- `POST /predict` → returns latest LMP prediction using the saved model
+- `GET /health` – basic status
+- `POST /predict` – returns the latest LMP prediction
 
-## CI
+## Testing and CI
 
-- GitHub Actions at `.github/workflows/ci.yml` runs `pytest` on push/PR.
+- Run tests locally: `pytest -q`
+- CI: `.github/workflows/ci.yml` executes tests on push/PR
 
 ## Roadmap
 
@@ -109,5 +128,5 @@ Service exposes a LoadBalancer on port 80 forwarded to container port 8000.
 - Argo Workflows for scheduled retraining pipelines
 - Canary/blue‑green deployment (ALB weighted routing)
 - S3 optimization (partitioning, compaction jobs)
-- Prefect or Dagster orchestration layer
-- SOC2 logging, IAM hardening, zero‑trust configuration
+- Prefect / Dagster orchestration layer
+- SOC2 logging, IAM hardening, zero‑trust config
