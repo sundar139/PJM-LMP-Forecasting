@@ -1,0 +1,54 @@
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+*.log
+
+# Virtualenv
+.venv/
+env/
+venv/
+
+# VS Code
+.vscode/
+
+# Data
+data/raw/*
+data/processed/*
+data/features/*
+data/models/*
+
+# MLflow runs
+mlruns/
+
+# Feast
+feature_repo/data/
+.feature_store/
+
+# Env
+.env
+*.env
+
+# Terraform
+.terraform/
+*.tfstate
+*.tfstate.backup
+terraform.tfvars
+.terraform.lock.hcl
+
+# Testing caches
+.pytest_cache/
+.mypy_cache/
+
+# Notebooks
+.ipynb_checkpoints/
+*.ipynb
+
+# OS
+.DS_Store
+
+# Artifacts
+artifacts/
+logs/
+

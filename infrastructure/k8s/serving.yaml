@@ -1,0 +1,46 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: pjm-serving
+  labels:
+    app: pjm-serving
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: pjm-serving
+  template:
+    metadata:
+      labels:
+        app: pjm-serving
+    spec:
+      containers:
+        - name: serving
+          image: ghcr.io/your-org/pjm-serving:latest
+          imagePullPolicy: IfNotPresent
+          ports:
+            - containerPort: 8000
+          volumeMounts:
+            - name: data
+              mountPath: /app/data
+      volumes:
+        - name: data
+          persistentVolumeClaim:
+            claimName: pjm-data-pvc
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: pjm-serving
+  labels:
+    app: pjm-serving
+spec:
+  type: LoadBalancer
+  ports:
+    - port: 80
+      targetPort: 8000
+      protocol: TCP
+      name: http
+  selector:
+    app: pjm-serving
+

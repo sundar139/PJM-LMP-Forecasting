@@ -1,0 +1,22 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: pjm-training-job
+spec:
+  template:
+    spec:
+      restartPolicy: Never
+      containers:
+        - name: training
+          image: ghcr.io/your-org/pjm-training:latest
+          imagePullPolicy: IfNotPresent
+          args: ["python", "-m", "training.train_xgb", "--test-run"]
+          volumeMounts:
+            - name: data
+              mountPath: /app/data
+      volumes:
+        - name: data
+          persistentVolumeClaim:
+            claimName: pjm-data-pvc
+  backoffLimit: 0
+
